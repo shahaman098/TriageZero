@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TriageZero — NHS Heat-Crisis Patient Prioritization</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --red: #dc2626;
+      --orange: #ea580c;
+      --yellow: #fbbf24;
+      --green: #16a34a;
+      --gray: #6b7280;
+      --gray-dark: #374151;
+      --gray-light: #f3f4f6;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      --shadow-hover: 0 4px 14px rgba(0, 0, 0, 0.14);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: #f8fafc;
+      color: #111827;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── HERO BANNER ── */
+    .hero {
+      background: linear-gradient(135deg, #991b1b 0%, #dc2626 45%, #ea580c 100%);
+      color: #fff;
+      padding: 36px 32px 40px;
+      text-align: center;
+    }
+
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 20px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .hero-metrics {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 40px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .metric {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .metric-value {
+      font-size: 52px;
+      font-weight: 800;
+      line-height: 1;
+      color: #fecaca;
+    }
+
+    .metric-value.alert-badge {
+      font-size: 22px;
+      background: #7f1d1d;
+      color: #fff;
+      padding: 10px 22px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      letter-spacing: 1px;
+      margin-top: 8px;
+    }
+
+    .metric-label {
+      font-size: 13px;
+      opacity: 0.85;
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .hero-context {
+      font-size: 16px;
+      opacity: 0.95;
+      max-width: 640px;
+      margin: 0 auto;
+      font-weight: 500;
+    }
+
+    /* ── SUMMARY STATS ── */
+    .stats-bar {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      flex-wrap: wrap;
+      gap: 0;
+      box-shadow: var(--shadow);
+    }
+
+    .stat-item {
+      padding: 18px 28px;
+      text-align: center;
+      border-right: 1px solid #e5e7eb;
+      min-width: 140px;
+      flex: 1;
+    }
+
+    .stat-item:last-child { border-right: none; }
+
+    .stat-number {
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--gray);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    .stat-critical .stat-number { color: var(--red); }
+    .stat-high .stat-number { color: var(--orange); }
+    .stat-medium .stat-number { color: #ca8a04; }
+    .stat-low .stat-number { color: var(--green); }
+    .stat-total .stat-number { color: var(--gray-dark); }
+
+    /* ── MAIN LAYOUT ── */
+    .container {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 28px 20px 60px;
+    }
+
+    /* ── CAPACITY SECTION ── */
+    .capacity-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      box-shadow: var(--shadow);
+      padding: 28px 32px;
+      margin-bottom: 28px;
+    }
+
+    .capacity-card h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 18px;
+      color: var(--gray-dark);
+    }
+
+    .capacity-inputs {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+
+    .input-group {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .input-group label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gray-dark);
+    }
+
+    .input-group input {
+      font-size: 18px;
+      font-weight: 700;
+      padding: 12px 14px;
+      border: 2px solid #d1d5db;
+      background: #f9fafb;
+      color: #111827;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .input-group input:focus {
+      border-color: var(--red);
+      background: #fff;
+    }
+
+    .capacity-result {
+      font-size: 20px;
+      font-weight: 800;
+      color: #111827;
+      margin-bottom: 6px;
+    }
+
+    .capacity-result span {
+      color: var(--red);
+    }
+
+    .capacity-hint {
+      font-size: 13px;
+      color: var(--gray);
+    }
+
+    /* ── SECTION HEADERS ── */
+    .band-header {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 10px 16px;
+      margin-top: 20px;
+      margin-bottom: 0;
+    }
+
+    .band-header:first-of-type { margin-top: 0; }
+
+    .band-header.critical {
+      background: #fee2e2;
+      color: #991b1b;
+      border-left: 4px solid var(--red);
+    }
+
+    .band-header.high {
+      background: #ffedd5;
+      color: #9a3412;
+      border-left: 4px solid var(--orange);
+    }
+
+    .band-header.medium {
+      background: #fef9c3;
+      color: #854d0e;
+      border-left: 4px solid var(--yellow);
+    }
+
+    .band-header.low {
+      background: #dcfce7;
+      color: #14532d;
+      border-left: 4px solid var(--green);
+    }
+
+    /* ── PATIENT LIST ── */
+    .patient-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .patient-row {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-top: none;
+      cursor: pointer;
+      transition: box-shadow 0.2s, transform 0.2s;
+      position: relative;
+    }
+
+    .patient-row:first-child,
+    .band-header + .patient-row {
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .patient-row:hover {
+      box-shadow: var(--shadow-hover);
+      transform: translateY(-1px);
+      z-index: 2;
+    }
+
+    .patient-row.in-capacity {
+      background: #fffbeb;
+    }
+
+    .patient-row.band-critical {
+      border-left: 4px solid var(--red);
+      background: #fff5f5;
+    }
+
+    .patient-row.band-critical.in-capacity {
+      background: #fef2f2;
+    }
+
+    .patient-row.band-high {
+      border-left: 4px solid var(--orange);
+      background: #fff7ed;
+    }
+
+    .patient-row.band-medium {
+      border-left: 4px solid var(--yellow);
+      background: #fefce8;
+    }
+
+    .patient-row.band-low {
+      border-left: 4px solid var(--green);
+      background: #f0fdf4;
+    }
+
+    .patient-summary {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px 18px;
+    }
+
+    .patient-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .patient-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    .patient-name {
+      font-size: 17px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .patient-row.band-critical .patient-name {
+      font-size: 18px;
+    }
+
+    .patient-age {
+      font-size: 14px;
+      color: var(--gray);
+      font-weight: 500;
+    }
+
+    .risk-badge {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      padding: 3px 9px;
+      text-transform: uppercase;
+    }
+
+    .risk-badge.critical {
+      background: var(--red);
+      color: #fff;
+    }
+
+    .risk-badge.high {
+      background: var(--orange);
+      color: #fff;
+    }
+
+    .risk-badge.medium {
+      background: var(--yellow);
+      color: #78350f;
+    }
+
+    .risk-badge.low {
+      background: var(--green);
+      color: #fff;
+    }
+
+    .in-capacity-tag {
+      font-size: 11px;
+      font-weight: 700;
+      color: #92400e;
+      background: #fef3c7;
+      padding: 2px 8px;
+      border: 1px solid #fcd34d;
+    }
+
+    .reasoning-summary {
+      font-size: 13px;
+      color: var(--gray);
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+
+    .expand-arrow {
+      font-size: 14px;
+      color: var(--gray);
+      transition: transform 0.3s ease;
+      flex-shrink: 0;
+      margin-top: 4px;
+      user-select: none;
+    }
+
+    .patient-row.open .expand-arrow {
+      transform: rotate(180deg);
+    }
+
+    /* ── EXPANDED DETAILS ── */
+    .patient-details {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .patient-row.open .patient-details {
+      max-height: 600px;
+    }
+
+    .details-inner {
+      padding: 0 18px 20px 18px;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 16px;
+    }
+
+    .details-inner h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--gray-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 10px;
+    }
+
+    .factors-list {
+      list-style: none;
+      margin-bottom: 16px;
+    }
+
+    .factors-list li {
+      font-size: 14px;
+      color: #374151;
+      padding: 5px 0 5px 20px;
+      position: relative;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .factors-list li:last-child { border-bottom: none; }
+
+    .factors-list li::before {
+      content: "•";
+      position: absolute;
+      left: 4px;
+      color: var(--red);
+      font-weight: 700;
+    }
+
+    .score-line {
+      font-size: 13px;
+      color: var(--gray);
+      margin-bottom: 14px;
+    }
+
+    .score-line strong {
+      color: #111827;
+      font-size: 16px;
+    }
+
+    .action-box {
+      padding: 14px 16px;
+      font-size: 15px;
+      font-weight: 700;
+      border-left: 4px solid;
+    }
+
+    .action-box.critical {
+      background: #fef2f2;
+      border-color: var(--red);
+      color: #991b1b;
+    }
+
+    .action-box.high {
+      background: #fff7ed;
+      border-color: var(--orange);
+      color: #9a3412;
+    }
+
+    .action-box.medium {
+      background: #fefce8;
+      border-color: var(--yellow);
+      color: #854d0e;
+    }
+
+    .action-box.low {
+      background: #f0fdf4;
+      border-color: var(--green);
+      color: #14532d;
+    }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: var(--gray);
+    }
+
+    .meta-row span strong {
+      color: var(--gray-dark);
+    }
+
+    /* ── CAPACITY CUTOFF DIVIDER ── */
+    .cutoff-divider {
+      margin: 20px 0;
+      padding: 18px 20px;
+      background: #1f2937;
+      color: #fff;
+      text-align: center;
+      border: 3px solid #7f1d1d;
+      box-shadow: 0 4px 16px rgba(127, 29, 29, 0.35);
+    }
+
+    .cutoff-label {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #fca5a5;
+      margin-bottom: 6px;
+    }
+
+    .cutoff-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .cutoff-text strong {
+      color: #fca5a5;
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 12px;
+      color: var(--gray);
+      border-top: 1px solid #e5e7eb;
+      margin-top: 40px;
+    }
+
+    /* ── MOBILE ── */
+    @media (max-width: 768px) {
+      .hero {
+        padding: 28px 16px 32px;
+      }
+
+      .hero h1 {
+        font-size: 36px;
+      }
+
+      .hero-metrics {
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .metric-value {
+        font-size: 44px;
+      }
+
+      .stats-bar {
+        flex-direction: column;
+      }
+
+      .stat-item {
+        border-right: none;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 14px 20px;
+      }
+
+      .stat-item:last-child { border-bottom: none; }
+
+      .capacity-inputs {
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .capacity-card {
+        padding: 20px 16px;
+      }
+
+      .container {
+        padding: 20px 12px 48px;
+      }
+
+      .patient-summary {
+        padding: 14px 12px;
+      }
+
+      .patient-name {
+        font-size: 16px;
+      }
+
+      .patient-row.band-critical .patient-name {
+        font-size: 16px;
+      }
+
+      .cutoff-divider {
+        padding: 14px 12px;
+      }
+
+      .cutoff-label {
+        font-size: 13px;
+        letter-spacing: 1px;
+      }
+
+      .cutoff-text {
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HERO BANNER -->
+  <header class="hero">
+    <h1>TriageZero</h1>
+    <div class="hero-metrics">
+      <div class="metric">
+        <div class="metric-value">33°C</div>
+        <div class="metric-label">Temperature</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value">AQI 145</div>
+        <div class="metric-label">Air Quality</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value alert-badge">RED ALERT</div>
+        <div class="metric-label">Heat-Health Alert</div>
+      </div>
+    </div>
+    <p class="hero-context">Severe heatwave + poor air quality — vulnerable patients at extreme risk</p>
+  </header>
+
+  <!-- SUMMARY STATS -->
+  <div class="stats-bar" id="statsBar"></div>
+
+  <main class="container">
+    <!-- CAPACITY SECTION -->
+    <section class="capacity-card">
+      <h2>Today's Team Capacity</h2>
+      <div class="capacity-inputs">
+        <div class="input-group">
+          <label for="staffInput">👥 Staff available today</label>
+          <input type="number" id="staffInput" min="1" max="50" value="2" />
+        </div>
+        <div class="input-group">
+          <label for="minutesInput">⏱️ Minutes per visit</label>
+          <input type="number" id="minutesInput" min="5" max="180" step="5" value="30" />
+        </div>
+      </div>
+      <div class="capacity-result" id="capacityResult">→ You can see <span>6</span> patients today</div>
+      <p class="capacity-hint">Adjust based on your team's actual availability · Assumes 90 minutes of visit time per staff member</p>
+    </section>
+
+    <!-- PATIENT LIST -->
+    <div class="patient-list" id="patientList"></div>
+  </main>
+
+  <footer class="footer">
+    TriageZero — Evidence-based heat-crisis triage for NHS care coordinators · Demo data · Offline-ready
+  </footer>
+
+  <script>
+    // ── TODAY'S CONDITIONS ──
+    const CONDITIONS = {
+      temperature: 33,
+      aqi: 145,
+      alertLevel: "RED",
+      condition: "Severe heatwave + poor air quality"
+    };
+
+    // ── PATIENT DATA ──
+    const PATIENTS = [
+      { id: 1, name: "Margaret Thompson", age: 84, conditions: ["asthma"], livesAlone: true, hasAC: false, floor: "upper", lastCheckIn: 5, postcode: "E1 6AN" },
+      { id: 2, name: "John Harris", age: 79, conditions: ["heart"], livesAlone: true, hasAC: false, floor: "ground", lastCheckIn: 7, postcode: "E2 8DP" },
+      { id: 3, name: "Patricia Williams", age: 76, conditions: ["diabetes", "heart"], livesAlone: false, hasAC: true, floor: "ground", lastCheckIn: 1, postcode: "E3 2JT" },
+      { id: 4, name: "Robert Smith", age: 72, conditions: ["diabetes"], livesAlone: false, hasAC: true, floor: "ground", lastCheckIn: 2, postcode: "EC1A 1BB" },
+      { id: 5, name: "Susan Jones", age: 88, conditions: ["dementia", "heart"], livesAlone: true, hasAC: false, floor: "upper", lastCheckIn: 6, postcode: "E4 6NT" },
+      { id: 6, name: "Michael Brown", age: 68, conditions: ["asthma", "mobility"], livesAlone: true, hasAC: false, floor: "upper", lastCheckIn: 3, postcode: "E5 0NG" },
+      { id: 7, name: "Anne Davis", age: 82, conditions: ["heart", "diabetes"], livesAlone: false, hasAC: false, floor: "upper", lastCheckIn: 4, postcode: "E6 1QH" },
+      { id: 8, name: "George Wilson", age: 75, conditions: ["diabetes"], livesAlone: true, hasAC: true, floor: "ground", lastCheckIn: 2, postcode: "E7 8AA" },
+      { id: 9, name: "Janet Moore", age: 81, conditions: ["asthma", "dementia"], livesAlone: false, hasAC: false, floor: "ground", lastCheckIn: 5, postcode: "E8 1ER" },
+      { id: 10, name: "David Taylor", age: 70, conditions: [], livesAlone: true, hasAC: true, floor: "ground", lastCheckIn: 1, postcode: "E9 5LA" },
+      { id: 11, name: "Elizabeth Martin", age: 86, conditions: ["heart", "mobility"], livesAlone: true, hasAC: false, floor: "upper", lastCheckIn: 8, postcode: "E10 7NR" },
+      { id: 12, name: "James Anderson", age: 74, conditions: ["asthma"], livesAlone: false, hasAC: true, floor: "ground", lastCheckIn: 1, postcode: "E11 1JF" },
+      { id: 13, name: "Margaret White", age: 83, conditions: ["diabetes", "heart", "dementia"], livesAlone: true, hasAC: false, floor: "upper", lastCheckIn: 9, postcode: "E12 6BL" },
+      { id: 14, name: "Christopher Harris", age: 69, conditions: ["heart"], livesAlone: false, hasAC: true, floor: "ground", lastCheckIn: 2, postcode: "E13 9PF" },
+      { id: 15, name: "Helen King", age: 77, conditions: ["asthma", "heart"], livesAlone: false, hasAC: false, floor: "upper", lastCheckIn: 3, postcode: "E14 3BH" },
+      { id: 16, name: "Peter Scott", age: 73, conditions: [], livesAlone: true, hasAC: true, floor: "ground", lastCheckIn: 1, postcode: "E15 1AY" },
+      { id: 17, name: "Dorothy Green", age: 85, conditions: ["dementia"], livesAlone: true, hasAC: false, floor: "upper", lastCheckIn: 7, postcode: "E16 2QR" },
+      { id: 18, name: "Charles Adams", age: 71, conditions: ["diabetes", "mobility"], livesAlone: false, hasAC: false, floor: "ground", lastCheckIn: 4, postcode: "E17 7QS" },
+      { id: 19, name: "Betty Baker", age: 80, conditions: ["heart", "asthma"], livesAlone: true, hasAC: false, floor: "upper", lastCheckIn: 6, postcode: "E18 1ER" },
+      { id: 20, name: "Ronald Hall", age: 66, conditions: ["heart"], livesAlone: false, hasAC: true, floor: "ground", lastCheckIn: 1, postcode: "E19 2JG" }
+    ];
+
+    const ACTIONS = {
+      CRITICAL: "🚨 Home visit today — highest priority",
+      HIGH: "⚠️ Phone check-in today",
+      MEDIUM: "📞 Check-in this week",
+      LOW: "✅ No action needed"
+    };
+
+    // Effective visit window per staff member.
+    // 2 staff × 90 min ÷ 30 min/visit = 6 patients (matches demo walkthrough).
+    const MINUTES_PER_STAFF = 90;
+
+    // ── RISK SCORING ──
+    function calculateRisk(patient) {
+      let score = 0;
+      let factors = [];
+      const { temperature, aqi } = CONDITIONS;
+
+      if (patient.age >= 80) {
+        score += 3;
+        factors.push({ text: "Age 80+ (high physiological risk)", points: 3 });
+      } else if (patient.age >= 70) {
+        score += 2;
+        factors.push({ text: "Age 70-79 (increased vulnerability)", points: 2 });
+      } else if (patient.age >= 60) {
+        score += 1;
+        factors.push({ text: "Age 60-69 (baseline risk)", points: 1 });
+      }
+
+      if (patient.conditions.includes("asthma") && aqi > 120) {
+        score += 3;
+        factors.push({ text: "Asthma + AQI 145 today (breathing is dangerous)", points: 3 });
+      }
+      if (patient.conditions.includes("heart") && temperature > 32) {
+        score += 3;
+        factors.push({ text: "Heart condition + 33°C heat (cardiac strain)", points: 3 });
+      }
+      if (patient.conditions.includes("diabetes")) {
+        score += 2;
+        factors.push({ text: "Diabetes (impaired heat regulation)", points: 2 });
+      }
+      if (patient.conditions.includes("dementia")) {
+        score += 2;
+        factors.push({ text: "Dementia (can't report distress)", points: 2 });
+      }
+      if (patient.conditions.includes("mobility")) {
+        score += 1;
+        factors.push({ text: "Mobility issues (can't escape heat)", points: 1 });
+      }
+
+      if (patient.livesAlone) {
+        score += 2;
+        factors.push({ text: "Lives alone (no one to notice deterioration)", points: 2 });
+      }
+      if (!patient.hasAC) {
+        score += 2;
+        factors.push({ text: "No air conditioning", points: 2 });
+      }
+      if (patient.floor === "upper") {
+        score += 1;
+        factors.push({ text: "Upper floor (heat accumulation)", points: 1 });
+      }
+
+      if (patient.lastCheckIn > 3) {
+        score += 2;
+        factors.push({ text: `Last checked ${patient.lastCheckIn} days ago`, points: 2 });
+      }
+
+      let band = "LOW";
+      if (score >= 10) band = "CRITICAL";
+      else if (score >= 7) band = "HIGH";
+      else if (score >= 4) band = "MEDIUM";
+
+      return { score, band, factors };
+    }
+
+    // ── PRECOMPUTE & SORT ──
+    const rankedPatients = PATIENTS.map(p => {
+      const risk = calculateRisk(p);
+      return { ...p, ...risk };
+    }).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+
+    // ── CAPACITY ──
+    function getCapacity() {
+      const staff = Math.max(1, parseInt(document.getElementById("staffInput").value, 10) || 1);
+      const minutes = Math.max(5, parseInt(document.getElementById("minutesInput").value, 10) || 30);
+      const totalMinutes = staff * MINUTES_PER_STAFF;
+      return Math.max(1, Math.floor(totalMinutes / minutes));
+    }
+
+    function updateCapacityLabel(capacity) {
+      document.getElementById("capacityResult").innerHTML =
+        `→ You can see <span>${capacity}</span> patient${capacity === 1 ? "" : "s"} today`;
+    }
+
+    // ── STATS BAR ──
+    function renderStats() {
+      const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+      rankedPatients.forEach(p => counts[p.band]++);
+      const atRisk = counts.CRITICAL + counts.HIGH + counts.MEDIUM;
+
+      document.getElementById("statsBar").innerHTML = `
+        <div class="stat-item stat-critical">
+          <div class="stat-number">${counts.CRITICAL}</div>
+          <div class="stat-label">🚨 Critical</div>
+        </div>
+        <div class="stat-item stat-high">
+          <div class="stat-number">${counts.HIGH}</div>
+          <div class="stat-label">🟡 High</div>
+        </div>
+        <div class="stat-item stat-medium">
+          <div class="stat-number">${counts.MEDIUM}</div>
+          <div class="stat-label">🟠 Medium</div>
+        </div>
+        <div class="stat-item stat-low">
+          <div class="stat-number">${counts.LOW}</div>
+          <div class="stat-label">🟢 Low</div>
+        </div>
+        <div class="stat-item stat-total">
+          <div class="stat-number">${atRisk}</div>
+          <div class="stat-label">At-risk of ${rankedPatients.length}</div>
+        </div>
+      `;
+    }
+
+    // ── HELPERS ──
+    function bandClass(band) {
+      return band.toLowerCase();
+    }
+
+    function summaryReason(patient) {
+      const top = patient.factors.slice(0, 2).map(f => f.text.split("(")[0].trim());
+      if (top.length === 0) return "Minimal risk factors today";
+      return top.join(" · ") + (patient.factors.length > 2 ? " · +" + (patient.factors.length - 2) + " more" : "");
+    }
+
+    function formatConditions(conditions) {
+      if (!conditions.length) return "None recorded";
+      return conditions.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(", ");
+    }
+
+    // ── RENDER LIST ──
+    let openPatientId = null;
+
+    function renderList() {
+      const capacity = getCapacity();
+      updateCapacityLabel(capacity);
+      const list = document.getElementById("patientList");
+      list.innerHTML = "";
+
+      let lastBand = null;
+      const waiting = rankedPatients.length - capacity;
+
+      rankedPatients.forEach((patient, index) => {
+        // Band section header when band changes
+        if (patient.band !== lastBand) {
+          const header = document.createElement("div");
+          header.className = `band-header ${bandClass(patient.band)}`;
+          const icons = { CRITICAL: "🚨", HIGH: "🟡", MEDIUM: "🟠", LOW: "🟢" };
+          header.textContent = `${icons[patient.band]} ${patient.band}`;
+          list.appendChild(header);
+          lastBand = patient.band;
+        }
+
+        const inCapacity = index < capacity;
+        const row = document.createElement("div");
+        row.className = `patient-row band-${bandClass(patient.band)}${inCapacity ? " in-capacity" : ""}${openPatientId === patient.id ? " open" : ""}`;
+        row.dataset.id = patient.id;
+
+        const factorsHtml = patient.factors.map(f =>
+          `<li>${f.text} <strong>+${f.points}</strong></li>`
+        ).join("");
+
+        row.innerHTML = `
+          <div class="patient-summary">
+            <div class="patient-main">
+              <div class="patient-top">
+                <span class="patient-name">${patient.name}</span>
+                <span class="patient-age">${patient.age} yrs</span>
+                <span class="risk-badge ${bandClass(patient.band)}">${patient.band}</span>
+                ${inCapacity ? '<span class="in-capacity-tag">IN CAPACITY</span>' : ""}
+              </div>
+              <div class="reasoning-summary">${summaryReason(patient)}</div>
+            </div>
+            <span class="expand-arrow">▼</span>
+          </div>
+          <div class="patient-details">
+            <div class="details-inner">
+              <div class="meta-row">
+                <span><strong>Postcode:</strong> ${patient.postcode}</span>
+                <span><strong>Conditions:</strong> ${formatConditions(patient.conditions)}</span>
+                <span><strong>Lives alone:</strong> ${patient.livesAlone ? "Yes" : "No"}</span>
+                <span><strong>AC:</strong> ${patient.hasAC ? "Yes" : "No"}</span>
+                <span><strong>Floor:</strong> ${patient.floor}</span>
+                <span><strong>Last check-in:</strong> ${patient.lastCheckIn} day${patient.lastCheckIn === 1 ? "" : "s"} ago</span>
+              </div>
+              <h4>Risk factors</h4>
+              <ul class="factors-list">${factorsHtml || "<li>No significant risk factors</li>"}</ul>
+              <div class="score-line">Total risk score: <strong>${patient.score}</strong> → ${patient.band}</div>
+              <div class="action-box ${bandClass(patient.band)}">${ACTIONS[patient.band]}</div>
+            </div>
+          </div>
+        `;
+
+        row.querySelector(".patient-summary").addEventListener("click", () => {
+          togglePatient(patient.id);
+        });
+
+        list.appendChild(row);
+
+        // Insert cutoff divider after the Nth patient
+        if (index === capacity - 1) {
+          const divider = document.createElement("div");
+          divider.className = "cutoff-divider";
+          divider.innerHTML = `
+            <div class="cutoff-label">━━ CAPACITY CUTOFF ━━</div>
+            <div class="cutoff-text">
+              <strong>${capacity}</strong> patient${capacity === 1 ? "" : "s"} fit your capacity today.
+              <strong>${Math.max(0, waiting)}</strong> patient${waiting === 1 ? "" : "s"} wait.
+            </div>
+          `;
+          list.appendChild(divider);
+        }
+      });
+    }
+
+    function togglePatient(id) {
+      if (openPatientId === id) {
+        openPatientId = null;
+      } else {
+        openPatientId = id;
+      }
+      // Update open state without full re-render to keep animation smooth
+      document.querySelectorAll(".patient-row").forEach(row => {
+        const rowId = parseInt(row.dataset.id, 10);
+        if (rowId === openPatientId) {
+          row.classList.add("open");
+        } else {
+          row.classList.remove("open");
+        }
+      });
+    }
+
+    // ── INIT ──
+    function init() {
+      renderStats();
+      renderList();
+
+      const staffInput = document.getElementById("staffInput");
+      const minutesInput = document.getElementById("minutesInput");
+
+      ["input", "change"].forEach(evt => {
+        staffInput.addEventListener(evt, renderList);
+        minutesInput.addEventListener(evt, renderList);
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>
