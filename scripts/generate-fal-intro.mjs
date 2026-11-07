@@ -6,7 +6,7 @@ import { fal } from "@fal-ai/client";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
 const qaDir = path.join(rootDir, "qa");
-const imagePath = path.join(qaDir, "mobile-finished.png");
+const imagePath = path.join(qaDir, "mobile-idle.png");
 const outputPath = path.join(qaDir, "fal-intro.mp4");
 
 if (!process.env.FAL_KEY) {
